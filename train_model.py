@@ -1,5 +1,4 @@
 import os
-
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
@@ -12,17 +11,21 @@ from ml.model import (
     save_model,
     train_model,
 )
-# TODO: load the cencus.csv data
-project_path = "Your path here"
+
+# Set base project directory
+project_path = os.path.dirname(os.path.abspath(__file__))
 data_path = os.path.join(project_path, "data", "census.csv")
-print(data_path)
-data = None # your code here
+print(f"Loading data from: {data_path}")
+data = pd.read_csv(data_path)
 
-# TODO: split the provided data to have a train dataset and a test dataset
-# Optional enhancement, use K-fold cross validation instead of a train-test split.
-train, test = None, None# Your code here
+# Clean leading/trailing whitespaces in column names and string values
+data.columns = [col.strip() for col in data.columns]
+for col in data.select_dtypes(include=["object"]).columns:
+    data[col] = data[col].astype(str).str.strip()
 
-# DO NOT MODIFY
+# Split data into train and test sets
+train, test = train_test_split(data, test_size=0.20, random_state=42)
+
 cat_features = [
     "workclass",
     "education",
@@ -34,14 +37,15 @@ cat_features = [
     "native-country",
 ]
 
-# TODO: use the process_data function provided to process the data.
+# Process training data
 X_train, y_train, encoder, lb = process_data(
-    # your code here
-    # use the train dataset 
-    # use training=True
-    # do not need to pass encoder and lb as input
-    )
+    train,
+    categorical_features=cat_features,
+    label="salary",
+    training=True,
+)
 
+# Process test data
 X_test, y_test, _, _ = process_data(
     test,
     categorical_features=cat_features,
@@ -51,37 +55,56 @@ X_test, y_test, _, _ = process_data(
     lb=lb,
 )
 
-# TODO: use the train_model function to train the model on the training dataset
-model = None # your code here
+# Train the model
+print("Training model...")
+model = train_model(X_train, y_train)
 
-# save the model and the encoder
+# Ensure model directory exists
+os.makedirs(os.path.join(project_path, "model"), exist_ok=True)
+
+# Save the model, encoder, and label binarizer
 model_path = os.path.join(project_path, "model", "model.pkl")
-save_model(model, model_path)
 encoder_path = os.path.join(project_path, "model", "encoder.pkl")
+lb_path = os.path.join(project_path, "model", "lb.pkl")
+
+save_model(model, model_path)
+print(f"Model saved to {model_path}")
 save_model(encoder, encoder_path)
+print(f"Encoder saved to {encoder_path}")
+save_model(lb, lb_path)
+print(f"Label binarizer saved to {lb_path}")
 
-# load the model
-model = load_model(
-    model_path
-) 
+# Load the saved model to verify persistence
+model = load_model(model_path)
 
-# TODO: use the inference function to run the model inferences on the test dataset.
-preds = None # your code here
+# Run inference on test dataset
+preds = inference(model, X_test)
 
-# Calculate and print the metrics
+# Calculate and print overall metrics
 p, r, fb = compute_model_metrics(y_test, preds)
-print(f"Precision: {p:.4f} | Recall: {r:.4f} | F1: {fb:.4f}")
+print(f"Overall Metrics - Precision: {p:.4f} | Recall: {r:.4f} | F1: {fb:.4f}")
 
-# TODO: compute the performance on model slices using the performance_on_categorical_slice function
-# iterate through the categorical features
+# Compute and log performance on categorical slices
+slice_output_file = os.path.join(project_path, "slice_output.txt")
+with open(slice_output_file, "w") as f:
+    f.write("Categorical Slices Performance\n")
+    f.write("=" * 40 + "\n")
+
 for col in cat_features:
-    # iterate through the unique values in one categorical feature
     for slicevalue in sorted(test[col].unique()):
         count = test[test[col] == slicevalue].shape[0]
-        p, r, fb = performance_on_categorical_slice(
-            # your code here
-            # use test, col and slicevalue as part of the input
+        sp, sr, sfb = performance_on_categorical_slice(
+            data=test,
+            column_name=col,
+            slice_value=slicevalue,
+            categorical_features=cat_features,
+            label="salary",
+            encoder=encoder,
+            lb=lb,
+            model=model,
         )
-        with open("slice_output.txt", "a") as f:
+        with open(slice_output_file, "a") as f:
             print(f"{col}: {slicevalue}, Count: {count:,}", file=f)
-            print(f"Precision: {p:.4f} | Recall: {r:.4f} | F1: {fb:.4f}", file=f)
+            print(f"Precision: {sp:.4f} | Recall: {sr:.4f} | F1: {sfb:.4f}\n", file=f)
+
+print(f"Slice metrics successfully saved to {slice_output_file}")
