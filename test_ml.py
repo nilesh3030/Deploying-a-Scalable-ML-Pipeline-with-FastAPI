@@ -74,7 +74,7 @@ def test_train_model_algorithm():
 
 
 def test_compute_model_metrics():
-    """Test compute_model_metrics outputs bounded floats within [0, 1]."""
+    """Test compute_model_metrics outputs exact expected numerical values."""
     y_true = np.array([0, 1, 1, 0, 1])
     y_pred = np.array([0, 1, 0, 0, 1])
 
@@ -83,6 +83,8 @@ def test_compute_model_metrics():
     assert isinstance(precision, float)
     assert isinstance(recall, float)
     assert isinstance(fbeta, float)
-    assert 0.0 <= precision <= 1.0
-    assert 0.0 <= recall <= 1.0
-    assert 0.0 <= fbeta <= 1.0
+
+    # 2 TP, 0 FP, 1 FN -> Precision: 1.0, Recall: 2/3, F1: 0.8
+    assert precision == pytest.approx(1.0)
+    assert recall == pytest.approx(2 / 3)
+    assert fbeta == pytest.approx(0.8)
